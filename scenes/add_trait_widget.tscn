@@ -1,0 +1,35 @@
+[gd_scene format=3 uid="uid://b6xrrs4b6f6e6"]
+
+[node name="AddTraitWidget" type="MarginContainer"]
+modulate = Color(1, 1.25, 1, 1)
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 0
+theme_override_constants/margin_top = 0
+theme_override_constants/margin_right = 0
+theme_override_constants/margin_bottom = 0
+
+[node name="Panel" type="Panel" parent="."]
+layout_mode = 2
+
+[node name="Container" type="HBoxContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="MarginContainer" type="MarginContainer" parent="Container"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/margin_left = 0
+theme_override_constants/margin_top = 0
+theme_override_constants/margin_right = 0
+theme_override_constants/margin_bottom = 0
+
+[node name="Label" type="Label" parent="Container/MarginContainer"]
+layout_mode = 2
+text = "Add Trait"
+horizontal_alignment = 1
+vertical_alignment = 1
