@@ -60,20 +60,17 @@ func _ready() -> void:
 
 ## Called during the processing step of the main loop
 ## (See [method Node._process]).
-@warning_ignore(unused_parameter)
 func _process(delta:float) -> void:
 	pass
 
 
 ## Called during the physics processing step of the main loop
 ## (See [method Node._process]).
-@warning_ignore(unused_parameter)
 func _physics_process(delta:float) -> void:
 	pass
 
 
 ## Called when there is an input event (See [method Node._input]).
-@warning_ignore(unused_parameter)
 func _input(event:InputEvent) -> void:
 	pass
 
@@ -81,21 +78,18 @@ func _input(event:InputEvent) -> void:
 ## Called when an [InputEventKey] or [InputEventShortcut] hasn't been consumed
 ## by [method _input] or any GUI Control item
 ## (See [method Node._shortcut_input]).
-@warning_ignore(unused_parameter)
 func _shortcut_input(event:InputEvent) -> void:
 	pass
 
 
 ## Called when an [InputEvent] hasn't been consumed by [member _input] or any
 ## GUI Control item (See [method Node._unhandled_input]).
-@warning_ignore(unused_parameter)
 func _unhandled_input(event:InputEvent) -> void:
 	pass
 
 
 ## Called when an [InputEventKey] hasn't been consumed by [member _input] or
 ## any GUI Control item (See [method Node._unhandled_key_input]).
-@warning_ignore(unused_parameter)
 func _unhandled_key_input(event:InputEventKey):
 	pass
 

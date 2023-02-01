@@ -107,7 +107,7 @@ func _get(property:StringName):
 	match property.split("/") as Array:
 		# --- Get for storage ---
 
-		[&"gs_trait", var file_name]:
+		[&"gs_trait", var file_name, var _index]:
 			# Save trait
 			var trait_script:= trait_script_from_file_name(file_name)
 			return trait_script
@@ -126,77 +126,88 @@ func _get(property:StringName):
 
 
 func _set(property:StringName, value):
-	var trait_set:= func(file_name:String, index:int, property_name:String):
-		var trait_script:= trait_script_from_file_name(file_name)
-		if not trait_script:
-			return false
-
-		_traits[trait_script][index].set(property_name, value)
-		return true
-
+	var file_name:= ""
+	var index:= 0
+	var property_name:= ""
 	match property.split("/") as Array:
 		# --- Set from storage ---
-
-		[&"gs_trait", var _file_name]:
+		[&"gs_trait", var _file_name, var _index]:
 			# Load trait
+			index = int(_index)
 			var trait_script:= value as Script
+			if trait_script in _traits and index < _traits[trait_script].size():
+				return true
 			add_trait(trait_script.new())
-
-		[&"gs_trait", var file_name, var index, var property_name]:
+			return true
+		[&"gs_trait", var _file_name, var _index, var _property_name]:
 			# Load trait property
-			return trait_set.call(file_name, index as int, property_name)
+			file_name = _file_name
+			index = int(_index)
+			property_name = _property_name
 
 		# --- Set from inspector ---
-
-		[var file_name, var index, var property_name]:
-			return trait_set.call(file_name, index as int, property_name)
-
-		[var file_name, var property_name]:
-			return trait_set.call(file_name, 0, property_name)
-
-	return false
+		[var _file_name, var _index, var _property_name]:
+			file_name = _file_name
+			index = int(_index)
+			property_name = _property_name
+		[var _file_name, var _property_name]:
+			file_name = _file_name
+			property_name = _property_name
+			
+		# --- Other ---
+		_:
+			return false
+	
+	# Set trait property
+	var trait_script:= trait_script_from_file_name(file_name)
+	if not trait_script:
+		return false
+	_traits[trait_script][index].set(property_name, value)
+	return true
 
 
 func _property_can_revert(property:StringName):
+	var trait_name:= ""
+	var index:= 0
+	var t_property:= ""
 	match property.split("/") as Array:
-		[var trait_name, var t_property]:
-			var trait_script:= trait_script_from_file_name(trait_name)
-			if not trait_script:
-				return false
-			var value = _traits[trait_script][0].get(t_property)
-			var default = _GsTraitMetadata.get_default_value(self, property)
-			return value != default
+		[var _trait_name, var _t_property]:
+			trait_name = _trait_name
+			t_property = _t_property
+		[var _trait_name, var _index, var _t_property]:
+			trait_name = _trait_name
+			index = int(_index)
+			t_property = _t_property
+		_:
+			return false
 
-		[var trait_name, var index, var t_property]:
-			var trait_script:= trait_script_from_file_name(trait_name)
-			if not trait_script:
-				return false
-			var value = _traits[trait_script][int(index)].get(t_property)
-			var default = _GsTraitMetadata.get_default_value(self, property)
-			return value != default
-
-	return false
+	var trait_script:= trait_script_from_file_name(trait_name)
+	if not trait_script:
+		return false
+		
+	var value = _traits[trait_script][0].get(t_property)
+	var default = _GsTraitMetadata.get_default_value(self, property)
+	return value != default
 
 
 func _property_get_revert(property:StringName):
-	match property.split("/") as Array:
-		[var trait_name, var t_property]:
+	match property.split("/").size():
+		2, 3:
 			return _GsTraitMetadata.get_default_value(self, property)
-
-		[var trait_name, var index, var t_property]:
-			return _GsTraitMetadata.get_default_value(self, property)
+		_:
+			return null
 
 
 func _get_property_list() -> Array[Dictionary]:
 	var props:Array[Dictionary] = [
 		{
-			name = "__add_trait__",
+			name = "_",
 			type = TYPE_INT,
 			usage = PROPERTY_USAGE_EDITOR,
 		}
 	]
 
-	# Storage properters
+	# Properties for traits
 	for trait_script in _traits:
 		if trait_script == null:
 			continue
@@ -204,8 +215,9 @@ func _get_property_list() -> Array[Dictionary]:
 		var trait_name:= FileTool.name_from_path(trait_script.resource_path)
 		var i:= 0
 		for trait_object in _traits[trait_script]:
+			# Storage for adding a trait to the subject
 			var trait_definition_prop:= {
-				name = &"gs_trait/%s" % [trait_name],
+				name = &"gs_trait/%s/%s" % [trait_name, i],
 				type = TYPE_OBJECT,
 				hint = PROPERTY_HINT_RESOURCE_TYPE,
 				hint_string = "Script",
@@ -224,6 +236,8 @@ func _get_property_list() -> Array[Dictionary]:
 				if property.name.find(".") != -1:
 					taking_property = true
 					continue
+				if property.name == &"script":
+					taking_property = true
 				if not taking_property:
 					continue
 
@@ -233,51 +247,32 @@ func _get_property_list() -> Array[Dictionary]:
 					i,
 					property[&"name"],
 				]
-				property.name = &"gs_trait/%s" % base_property_name
-				property.usage = PROPERTY_USAGE_STORAGE \
-					if property.usage & PROPERTY_USAGE_STORAGE \
-					else 0
-				if _property_can_revert(base_property_name) or owner == null:
-					props.append(property)
-
-			i += 1
-
-	# Inspector properters
-	for key in _traits:
-		var i:= 0
-		for trait_object in _traits[key]:
-			if not trait_object:
-				continue
-
-			var taking_property:= false
-			for property in trait_object.get_property_list():
-				if property.name == &"Resource":
-					taking_property = false
-					continue
-				if property.name == &"RefCounted":
-					taking_property = false
-					continue
-				if property.name.find(".") != -1:
-					taking_property = true
-					continue
-				if property.name == &"script":
-					# Let 'script' bleed through
-					taking_property = true
-				if not taking_property:
-					continue
-
+				var storage_property:= {
+					name = &"gs_trait/%s" % base_property_name,
+					type = property.type,
+					hint = property.hint,
+					hint_string = property.hint_string,
+					usage = PROPERTY_USAGE_STORAGE \
+						if property.usage & PROPERTY_USAGE_STORAGE \
+						else 0,
+				}
+				if _property_can_revert(base_property_name):
+					props.append(storage_property)
+				
 				# Create and add inspector property
-				var trait_name:= FileTool.name_from_path(
-					trait_object.get_script().resource_path
-				)
-				property.name = "%s/%s" % [trait_name, property.name] \
-					if _traits[key].size() == 1 \
-					else "%s/%s/%s" % [trait_name, i, property.name]
-				property.usage = PROPERTY_USAGE_EDITOR \
-					if  property.usage & PROPERTY_USAGE_EDITOR \
-					else 0
-				if property.usage != 0:
-					props.append(property)
+				var inspector_property:= {
+					name = &"%s/%s" % [trait_name, property.name] \
+						if _traits[trait_script].size() == 1 \
+						else &"%s/%s/%s" % [trait_name, i, property.name],
+					type = property.type,
+					hint = property.hint,
+					hint_string = property.hint_string,
+					usage = PROPERTY_USAGE_EDITOR \
+						if  property.usage & PROPERTY_USAGE_EDITOR \
+						else 0,
+				}
+				if inspector_property.usage != 0:
+					props.append(inspector_property)
 
 			i += 1
 
@@ -343,7 +338,7 @@ func all_traits() -> Array[Trait]:
 	for traits_slice in _traits.values():
 		all_traits_list.append_array(traits_slice)
 
-	all_traits_list.set_read_only(true)
+	all_traits_list.make_read_only()
 	return all_traits_list
 
 
@@ -384,8 +379,8 @@ func remove_trait_at(script:Script, index:=0) -> void:
 func secure_trait(trait_script:Script, index:=0) -> Trait:
 	assert(
 		trait_script in _traits,
-		"Subject has no trait with script `%s`."
-			% [trait_script.resource_path]
+		"Subject has no trait with script `%s`. At subject '%s'."
+			% [trait_script.resource_path, get_path()]
 	)
 	assert(
 		_traits[trait_script].size() > index,

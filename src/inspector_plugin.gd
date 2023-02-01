@@ -73,7 +73,8 @@ func _parse_property(
 	usage_flags:int,
 	wide:bool,
 ):
-	return name == "__add_trait__"
+	# Remove inspector editor for property
+	return name == "_"
 
 
 func _do_add_trait():

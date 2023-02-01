@@ -50,8 +50,12 @@ func get_default_value(subject:Subject, property:StringName) -> Variant:
 	
 	var default_value = null
 	if subject.owner == null:
-		default_value = _default_value_from_trait(subject, trait_name, trait_property)
+		# Is scene root
+		default_value = _default_value_from_trait(
+			subject, trait_name, trait_property
+		)
 	else:
+		# Is instanced as packed scene
 		default_value =  _default_value_from_scene(
 			subject,
 			property,
@@ -97,12 +101,19 @@ func _default_value_from_trait(
 ) -> Variant:
 	# Get default value from trait script
 	var trait_script:= subject.trait_script_from_file_name(trait_name)
-	_default_trait_properties[trait_script.resource_path] \
-		= _default_trait_properties.get(trait_script.resource_path, trait_script.new())
 	
 	# Get default value
-	var default_value = _default_trait_properties \
-		[trait_script.resource_path].get(trait_property)
+	var default_value = null
+	if trait_script.get_property_default_value(&"_trait"):
+		# Can get default value from script
+		default_value = trait_script.get_property_default_value(trait_property)
+	else:
+		# Script is not loaded, use trait instance
+		_default_trait_properties[trait_script.resource_path] \
+			= _default_trait_properties \
+			.get(trait_script.resource_path, trait_script.new())
+		default_value = _default_trait_properties[trait_script.resource_path] \
+			.get(trait_property)
 	
 	# Duplicate if is object
 	if (
