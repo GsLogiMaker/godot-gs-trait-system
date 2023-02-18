@@ -4,97 +4,21 @@
 class_name Subject extends Node
 
 var _traits:Dictionary = {}
-var _is_ready:= false
 var _warning_check_timer:= 0.0
 
 func _init():
-	set_process(false)
-	set_process_internal(false)
-	set_physics_process(false)
-	set_physics_process_internal(false)
-	set_process_input(false)
-	set_process_shortcut_input(false)
-	set_process_unhandled_input(false)
-	set_process_unhandled_key_input(false)
+	child_entered_tree.connect(_on_child_entered_tree)
+	child_exiting_tree.connect(_on_child_exiting_tree)
 
 
-func _ready():
-	_is_ready = true
-
-
-func _process(delta:float) -> void:
-	if Engine.is_editor_hint():
-		_warning_check_timer += delta
-		if _warning_check_timer > 3.0:
-			_warning_check_timer = 0.0
-			update_configuration_warnings()
-
-		for slice in _traits.values():
-			for trait_object in slice:
-				if not trait_object:
-					continue
-				if not trait_object.script.is_tool():
-					continue
-				if not trait_object._flags & Trait.TraitFlags.PROCESS:
-					continue
-					trait_object._process(delta)
-
-	else:
-		for slice in _traits.values():
-			for trait_object in slice:
-				if not trait_object._flags & Trait.TraitFlags.PROCESS:
-					continue
-				trait_object._process(delta)
-
-
-func _physics_process(delta:float) -> void:
-	if Engine.is_editor_hint():
-		for slice in _traits.values():
-			for trait_object in slice:
-				if not trait_object:
-					continue
-				if not trait_object.script.is_tool():
-					continue
-				if not trait_object._flags & Trait.TraitFlags.PHYSICS_PROCESS:
-					continue
-				trait_object._physics_process(delta)
-	else:
-		for slice in _traits.values():
-			for trait_object in slice:
-				if not trait_object._flags & Trait.TraitFlags.PHYSICS_PROCESS:
-					continue
-				trait_object._physics_process(delta)
-
-
-func _input(event:InputEvent) -> void:
-	for slice in _traits.values():
-		for trait_object in slice:
-			if trait_object._flags & Trait.TraitFlags.INPUT:
-				trait_object._input(event)
-
-
-func _unhandled_input(event:InputEvent):
-	for slice in _traits.values():
-		for trait_object in slice:
-			if trait_object._flags & Trait.TraitFlags.UNHANDLED_INPUT:
-				trait_object._unhandled_input(event)
-
-
-func _unhandled_key_input(event:InputEvent):
-	for slice in _traits.values():
-		for trait_object in slice:
-			if trait_object._flags & Trait.TraitFlags.UNHANDLED_KEY_INPUT:
-				trait_object._unhandled_key_input(event)
-
-
-func _notification(what:int):
-	match what:
-		NOTIFICATION_PREDELETE:
-			for slice in _traits.values():
-				for trait_object in slice:
-					if trait_object is Resource:
-						continue
-					trait_object.free()
+func _process(delta):
+	_warning_check_timer += delta
+	if _warning_check_timer > 3.0:
+		_warning_check_timer = 0
+		update_configuration_warnings()
+		for trait_slice in _traits.values():
+			for trait_object in trait_slice:
+				trait_object.update_configuration_warnings()
 
 
 func _get(property:StringName):
@@ -105,8 +29,10 @@ func _get(property:StringName):
 		return _traits[trait_script][index].get(t_property)
 
 	match property.split("/") as Array:
+		[&"__add_trait__"]:
+			return null
+			
 		# --- Get for storage ---
-
 		[&"gs_trait", var file_name, var _index]:
 			# Save trait
 			var trait_script:= trait_script_from_file_name(file_name)
@@ -130,6 +56,12 @@ func _set(property:StringName, value):
 	var index:= 0
 	var property_name:= ""
 	match property.split("/") as Array:
+		[&"__add_trait__"]:
+			if value == null:
+				return false
+			var new_trait:Trait = (value as Script).new()
+			add_trait(new_trait)
+		
 		# --- Set from storage ---
 		[&"gs_trait", var _file_name, var _index]:
 			# Load trait
@@ -199,13 +131,15 @@ func _property_get_revert(property:StringName):
 
 
 func _get_property_list() -> Array[Dictionary]:
-	var props:Array[Dictionary] = [
-		{
-			name = "_",
-			type = TYPE_INT,
-			usage = PROPERTY_USAGE_EDITOR,
-		}
-	]
+	var props:Array[Dictionary] = []
+	
+	props.append({
+		name = &"__add_trait__",
+		type = TYPE_OBJECT,
+		hint = PROPERTY_HINT_RESOURCE_TYPE,
+		hint_string = "Script",
+		usage = PROPERTY_USAGE_EDITOR,
+	})
 
 	# Properties for traits
 	for trait_script in _traits:
@@ -215,15 +149,15 @@ func _get_property_list() -> Array[Dictionary]:
 		var trait_name:= FileTool.name_from_path(trait_script.resource_path)
 		var i:= 0
 		for trait_object in _traits[trait_script]:
-			# Storage for adding a trait to the subject
-			var trait_definition_prop:= {
-				name = &"gs_trait/%s/%s" % [trait_name, i],
-				type = TYPE_OBJECT,
-				hint = PROPERTY_HINT_RESOURCE_TYPE,
-				hint_string = "Script",
-				usage = PROPERTY_USAGE_STORAGE,
-			}
-			props.append(trait_definition_prop)
+#			# Storage for adding a trait to the subject
+#			var trait_definition_prop:= {
+#				name = &"gs_trait/%s/%s" % [trait_name, i],
+#				type = TYPE_OBJECT,
+#				hint = PROPERTY_HINT_RESOURCE_TYPE,
+#				hint_string = "Script",
+#				usage = PROPERTY_USAGE_STORAGE,
+#			}
+#			props.append(trait_definition_prop)
 
 			var taking_property:= false
 			for property in trait_object.get_property_list():
@@ -241,23 +175,23 @@ func _get_property_list() -> Array[Dictionary]:
 				if not taking_property:
 					continue
 
-				# Create and add storage property
 				var base_property_name:= &"%s/%s/%s" % [
 					trait_name,
 					i,
 					property[&"name"],
 				]
-				var storage_property:= {
-					name = &"gs_trait/%s" % base_property_name,
-					type = property.type,
-					hint = property.hint,
-					hint_string = property.hint_string,
-					usage = PROPERTY_USAGE_STORAGE \
-						if property.usage & PROPERTY_USAGE_STORAGE \
-						else 0,
-				}
-				if _property_can_revert(base_property_name):
-					props.append(storage_property)
+#				# Create and add storage property
+#				var storage_property:= {
+#					name = &"gs_trait/%s" % base_property_name,
+#					type = property.type,
+#					hint = property.hint,
+#					hint_string = property.hint_string,
+#					usage = PROPERTY_USAGE_STORAGE \
+#						if property.usage & PROPERTY_USAGE_STORAGE \
+#						else 0,
+#				}
+#				if _property_can_revert(base_property_name):
+#					props.append(storage_property)
 				
 				# Create and add inspector property
 				var inspector_property:= {
@@ -293,18 +227,21 @@ func _get_configuration_warnings() -> PackedStringArray:
 					+ " making the Trait a tool script."
 
 			)
-		else:
-			for trait_object in _traits[t]:
-				# Check traits have all their expected siblings
-				if not trait_object._assert_has_trait():
-					for missing in trait_object._missing_required_traits():
-						warnings.append(
-							trait_object._assert_message_missing_trait(missing),
-						)
-				# Check trait specific warnings
-				warnings.append_array(
-					trait_object._get_configuration_warnings()
-				)
+#		else:
+#			for trait_object in _traits[t]:
+#				# Check traits have all their expected siblings
+#				if not trait_object._assert_has_trait():
+#					for missing in trait_object._missing_required_traits():
+#						warnings.append(
+#							trait_object._assert_message_missing_trait(missing),
+#						)
+#				if not trait_object.has_method(&"_get_configuration_warnings"):
+#					continue
+#
+#				# Check trait specific warnings
+#				warnings.append_array(
+#					trait_object._get_configuration_warnings()
+#				)
 
 	return warnings
 
@@ -312,24 +249,19 @@ func _get_configuration_warnings() -> PackedStringArray:
 ## Adds a [Trait] to this subject.
 func add_trait(trait_object:Trait) -> void:
 	assert(
-		_assert_matches_trait_type(trait_object),
-		_assert_message_matches_trait_type(trait_object)
+		trait_object._is_subject_expected_type(self),
+		trait_object._message_subject_expected_type(self)
 	)
 
-	if not trait_object.script in _traits:
-		# Create a typed array for _traits with this specific script
-		_traits[trait_object.script] = Array(
-			[],
-			TYPE_OBJECT,
-			&"Resource",
-			Trait
-		)
-
-	_adding_trait(trait_object)
-
-	if not trait_object in _traits[trait_object.script]:
-		# Only add the trait if it's not already in the array.
-		_traits[trait_object.script].append(trait_object)
+	trait_object.name = StringHelper \
+		.name_from_path(trait_object.script.resource_path) \
+		.capitalize() \
+		.replace(" ", "")
+	add_child(trait_object, true, Node.INTERNAL_MODE_BACK)
+	if owner:
+		trait_object.owner = owner
+	else:
+		trait_object.owner = self
 
 
 ## Constructs an [Array] of all [Trait]s in this subject.
@@ -371,7 +303,8 @@ func remove_trait(trait_object:Trait) -> void:
 ## subject.
 func remove_trait_at(script:Script, index:=0) -> void:
 	var trait_object:Trait = _traits[script].pop_at(index)
-	_removing_trait(trait_object)
+	trait_object.get_parent().remove_child(trait_object)
+	trait_object.queue_free()
 
 
 ## Like [method get_trait], but errors if a trait with
@@ -400,31 +333,21 @@ func traits(script:Script) -> Array:
 func _adding_trait(trait_object:Trait):
 	if Engine.is_editor_hint():
 		_GsTraitMetadata.queue_notify_property_list_changed(self)
+	
+	if not trait_object.script in _traits:
+		# Create a typed array for _traits with this specific script
+		_traits[trait_object.script] = Array(
+			[],
+			TYPE_OBJECT,
+			&"Object",
+			Trait
+		)
 
-	if Engine.is_editor_hint() and not trait_object.get_script().is_tool():
-		# Trait is not a tool script, bail now to prevent errors in editor
-		return
-	if trait_object._subject == self:
-		# The trait was previously this subject's; no setup needed
-		return
+	_traits[trait_object.script].append(trait_object)
 
 	trait_object._subject = self
-
-	trait_object.script_changed.connect(_on_trait_script_changed, CONNECT_DEFERRED)
-	tree_entered.connect(trait_object._super_enter_tree)
-	ready.connect(trait_object._super_ready)
-	tree_exiting.connect(trait_object._super_exit_tree)
-
-	trait_object._super_enter_subject()
-	if is_inside_tree():
-		trait_object._super_enter_tree()
-	if _is_ready:
-		trait_object._super_ready()
-
-	if trait_object._flags & Trait.TraitFlags.PROCESS:
-		set_process(true)
-	if trait_object._flags & Trait.TraitFlags.PHYSICS_PROCESS:
-		set_physics_process(true)
+	if not trait_object.script_changed.is_connected(_on_trait_script_changed):
+		trait_object.script_changed.connect(_on_trait_script_changed, CONNECT_DEFERRED)
 
 
 # Called when [code]trait_object[/code] is being removed from this [Subject].
@@ -432,45 +355,25 @@ func _removing_trait(trait_object:Trait):
 	if Engine.is_editor_hint():
 		_GsTraitMetadata.queue_notify_property_list_changed(self)
 
-	if Engine.is_editor_hint() and not trait_object.get_script().is_tool():
-		# Trait is not a tool script, bail now to prevent errors in editor
-		return
+	_traits[trait_object.script].erase(trait_object)
+	if _traits[trait_object.script].size() == 0:
+		_traits.erase(trait_object.script)
+
 	assert(trait_object._subject == self or trait_object._subject == null)
 
 	trait_object._subject = null
 
-	trait_object.script_changed.disconnect(_on_trait_script_changed)
-	tree_entered.disconnect(trait_object._super_enter_tree)
-	ready.disconnect(trait_object._super_ready)
-	tree_exiting.disconnect(trait_object._super_exit_tree)
 
-	trait_object._super_exit_subject()
-	if is_inside_tree():
-		trait_object._super_exit_tree()
+func _on_child_entered_tree(child:Node):
+	if not child is Trait:
+		return
+	_adding_trait(child)
 
 
-func _assert_matches_trait_type(trait_object:Trait) -> bool:
-	if &"_get_subject_type" in trait_object:
-		var type = trait_object._get_subject_type()
-		if type:
-			return self is type
-
-	return true
-
-
-func _assert_message_matches_trait_type(trait_object:Trait) -> String:
-	var message:String = "Could not add trait `%s` to subject `%s`" % [
-		trait_object.get_script().resource_path,
-		name,
-	]
-	if trait_object.script.is_tool():
-		var subject_type_node = trait_object._get_subject_type().new()
-		message += " Expected subject's type to be %s, but is %s." % [
-			subject_type_node.get_class(),
-			get_class(),
-		]
-		subject_type_node.free()
-	return message
+func _on_child_exiting_tree(child:Node):
+	if not child is Trait:
+		return
+	_removing_trait(child)
 
 
 func _on_trait_script_changed():

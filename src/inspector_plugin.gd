@@ -63,14 +63,13 @@ func _parse_group(object:Object, group:String):
 		
 	last_group = group
 
-
 func _parse_property(
 	object:Object,
-	type:int,
+	type,
 	name:String,
-	hint_type:int,
+	hint_type,
 	hint_string:String,
-	usage_flags:int,
+	usage_flags,
 	wide:bool,
 ):
 	# Remove inspector editor for property
