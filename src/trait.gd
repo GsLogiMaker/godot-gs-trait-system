@@ -98,7 +98,7 @@ func _is_subject_expected_type(parent:Node=null) -> bool:
 	if parent == null:
 		parent = get_parent()
 	if _get_subject_type() != null:
-		return parent is _get_subject_type()
+		return is_instance_of(parent, _get_subject_type())
 
 	return true
 
