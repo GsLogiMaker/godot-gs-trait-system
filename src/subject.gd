@@ -130,87 +130,18 @@ func _property_get_revert(property:StringName):
 			return null
 
 
-#func _get_property_list() -> Array[Dictionary]:
-#	var props:Array[Dictionary] = []
-#
-#	props.append({
-#		name = &"__add_trait__",
-#		type = TYPE_OBJECT,
-#		hint = PROPERTY_HINT_RESOURCE_TYPE,
-#		hint_string = "Script",
-#		usage = PROPERTY_USAGE_EDITOR,
-#	})
-#
-#	# Properties for traits
-#	for trait_script in _traits:
-#		if trait_script == null:
-#			continue
-#
-#		var trait_name:= FileTool.name_from_path(trait_script.resource_path)
-#		var i:= 0
-#		for trait_object in _traits[trait_script]:
-##			# Storage for adding a trait to the subject
-##			var trait_definition_prop:= {
-##				name = &"gs_trait/%s/%s" % [trait_name, i],
-##				type = TYPE_OBJECT,
-##				hint = PROPERTY_HINT_RESOURCE_TYPE,
-##				hint_string = "Script",
-##				usage = PROPERTY_USAGE_STORAGE,
-##			}
-##			props.append(trait_definition_prop)
-#
-#			var taking_property:= false
-#			for property in trait_object.get_property_list():
-#				if property.name == &"Resource":
-#					taking_property = false
-#					continue
-#				if property.name == &"RefCounted":
-#					taking_property = false
-#					continue
-#				if property.name.find(".") != -1:
-#					taking_property = true
-#					continue
-#				if property.name == &"script":
-#					taking_property = true
-#				if not taking_property:
-#					continue
-#
-#				var base_property_name:= &"%s/%s/%s" % [
-#					trait_name,
-#					i,
-#					property[&"name"],
-#				]
-##				# Create and add storage property
-##				var storage_property:= {
-##					name = &"gs_trait/%s" % base_property_name,
-##					type = property.type,
-##					hint = property.hint,
-##					hint_string = property.hint_string,
-##					usage = PROPERTY_USAGE_STORAGE \
-##						if property.usage & PROPERTY_USAGE_STORAGE \
-##						else 0,
-##				}
-##				if _property_can_revert(base_property_name):
-##					props.append(storage_property)
-#
-#				# Create and add inspector property
-#				var inspector_property:= {
-#					name = &"%s/%s" % [trait_name, property.name] \
-#						if _traits[trait_script].size() == 1 \
-#						else &"%s/%s/%s" % [trait_name, i, property.name],
-#					type = property.type,
-#					hint = property.hint,
-#					hint_string = property.hint_string,
-#					usage = PROPERTY_USAGE_EDITOR \
-#						if  property.usage & PROPERTY_USAGE_EDITOR \
-#						else 0,
-#				}
-#				if inspector_property.usage != 0:
-#					props.append(inspector_property)
-#
-#			i += 1
-#
-#	return props
+func _get_property_list() -> Array[Dictionary]:
+	var props:Array[Dictionary] = []
+
+	props.append({
+		name = &"__add_trait__",
+		type = TYPE_OBJECT,
+		hint = PROPERTY_HINT_RESOURCE_TYPE,
+		hint_string = "Script",
+		usage = PROPERTY_USAGE_EDITOR,
+	})
+
+	return props
 
 
 func _get_configuration_warnings() -> PackedStringArray:
