@@ -158,21 +158,6 @@ func _get_configuration_warnings() -> PackedStringArray:
 					+ " making the Trait a tool script."
 
 			)
-#		else:
-#			for trait_object in _traits[t]:
-#				# Check traits have all their expected siblings
-#				if not trait_object._assert_has_trait():
-#					for missing in trait_object._missing_required_traits():
-#						warnings.append(
-#							trait_object._assert_message_missing_trait(missing),
-#						)
-#				if not trait_object.has_method(&"_get_configuration_warnings"):
-#					continue
-#
-#				# Check trait specific warnings
-#				warnings.append_array(
-#					trait_object._get_configuration_warnings()
-#				)
 
 	return warnings
 
